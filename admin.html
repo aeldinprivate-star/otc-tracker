@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OTC Tracker — Admin</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#ffffff;--bg2:#f8f8f6;--bg3:#f0efea;
+  --text:#1a1a1a;--text2:#666;--text3:#999;
+  --border:#e0e0d8;--border2:#ccc;
+  --green:#3B6D11;--green-bg:#EAF3DE;
+  --red:#A32D2D;--red-bg:#FCEBEB;
+  --blue:#185FA5;--blue-bg:#E6F1FB;
+  --amber:#854F0B;--amber-bg:#FAEEDA;
+  --radius:8px;--radius-lg:12px;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg3);color:var(--text)}
+.topbar{display:flex;justify-content:space-between;align-items:center;padding:14px 24px;background:var(--bg);border-bottom:0.5px solid var(--border);position:sticky;top:0;z-index:10}
+.topbar-title{font-size:16px;font-weight:500}
+.btn-logout{font-size:12px;color:var(--text2);background:none;border:0.5px solid var(--border2);padding:5px 10px;border-radius:var(--radius);cursor:pointer}
+.wrap{max-width:900px;margin:0 auto;padding:24px}
+.section-title{font-size:16px;font-weight:500;margin-bottom:14px}
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:28px}
+.stat{background:var(--bg);border-radius:var(--radius-lg);border:0.5px solid var(--border);padding:16px}
+.stat .lbl{font-size:11px;color:var(--text2);margin-bottom:4px}
+.stat .val{font-size:24px;font-weight:500}
+.card{background:var(--bg);border-radius:var(--radius-lg);border:0.5px solid var(--border);padding:20px;margin-bottom:20px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:8px 12px;font-weight:500;color:var(--text2);font-size:11px;text-transform:uppercase;letter-spacing:.4px;border-bottom:0.5px solid var(--border)}
+td{padding:10px 12px;border-bottom:0.5px solid var(--border)}
+tr:last-child td{border:none}
+.badge{font-size:11px;padding:3px 8px;border-radius:20px;font-weight:500}
+.b-active{background:var(--green-bg);color:var(--green)}
+.b-trial{background:var(--blue-bg);color:var(--blue)}
+.b-expired{background:var(--red-bg);color:var(--red)}
+.b-admin{background:#EEEDFE;color:#3C3489}
+select,input{padding:6px 10px;border:0.5px solid var(--border2);border-radius:var(--radius);font-size:13px;background:var(--bg);font-family:inherit}
+.btn-sm{padding:5px 10px;font-size:12px;border:0.5px solid var(--border2);border-radius:var(--radius);background:transparent;cursor:pointer;font-family:inherit}
+.btn-save{background:var(--text);color:var(--bg);border:none;padding:7px 14px;border-radius:var(--radius);font-size:13px;cursor:pointer;font-weight:500}
+.btn-danger{background:transparent;border:0.5px solid var(--red);color:var(--red);padding:5px 10px;font-size:12px;border-radius:var(--radius);cursor:pointer}
+.auth-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center}
+.auth-card{background:var(--bg);border-radius:var(--radius-lg);border:0.5px solid var(--border);padding:32px;width:100%;max-width:360px}
+.auth-title{font-size:20px;font-weight:500;margin-bottom:4px}
+.auth-sub{font-size:13px;color:var(--text2);margin-bottom:20px}
+.field{margin-bottom:14px}
+.field label{font-size:12px;color:var(--text2);display:block;margin-bottom:4px}
+.field input{width:100%;padding:10px 12px;border:0.5px solid var(--border2);border-radius:var(--radius);font-size:14px}
+.field input:focus{outline:none;border-color:var(--blue)}
+.btn-primary{width:100%;padding:11px;font-size:14px;font-weight:500;border:none;background:var(--text);color:var(--bg);border-radius:var(--radius);cursor:pointer}
+.auth-err{font-size:12px;color:var(--red);margin-top:10px;text-align:center;min-height:16px}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;align-items:center;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal{background:var(--bg);border-radius:var(--radius-lg);padding:24px;width:100%;max-width:420px;margin:20px}
+.modal h3{font-size:16px;font-weight:500;margin-bottom:16px}
+.modal-footer{display:flex;gap:8px;justify-content:flex-end;margin-top:20px}
+.ss{font-size:12px;color:var(--text2);margin-top:8px;min-height:16px}
+@media(max-width:600px){.stat-grid{grid-template-columns:repeat(2,1fr)}.wrap{padding:16px}}
+</style>
+</head>
+<body>
+
+<div id="auth-wrap" class="auth-wrap">
+  <div class="auth-card">
+    <div class="auth-title">Admin Panel</div>
+    <div class="auth-sub">Sign in with your admin account</div>
+    <div class="field"><label>Email</label><input id="l-email" type="email" placeholder="admin@email.com"></div>
+    <div class="field"><label>Password</label><input id="l-pass" type="password" placeholder="••••••••"></div>
+    <button class="btn-primary" onclick="signIn()">Sign in</button>
+    <div class="auth-err" id="auth-err"></div>
+  </div>
+</div>
+
+<div id="admin-panel" style="display:none">
+  <div class="topbar">
+    <div class="topbar-title">OTC Tracker — Admin</div>
+    <button class="btn-logout" onclick="signOut()">Sign out</button>
+  </div>
+  <div class="wrap">
+    <div class="stat-grid" id="admin-stats"></div>
+
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div class="section-title" style="margin:0">Users</div>
+        <button class="btn-save" onclick="openAddUser()">+ Add user</button>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Name / Email</th>
+            <th>Subscription</th>
+            <th>Expires</th>
+            <th>Trades</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="users-tbody"></tbody>
+      </table>
+      <div class="ss" id="users-status"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ADD USER MODAL -->
+<div class="modal-overlay" id="add-user-modal">
+  <div class="modal">
+    <h3>Add new user</h3>
+    <div class="field"><label>Full name</label><input id="nu-name" type="text" placeholder="User name"></div>
+    <div class="field"><label>Email</label><input id="nu-email" type="email" placeholder="user@email.com"></div>
+    <div class="field"><label>Password</label><input id="nu-pass" type="password" placeholder="Min 6 characters"></div>
+    <div class="field"><label>Subscription</label>
+      <select id="nu-sub" style="width:100%">
+        <option value="trial">Trial</option>
+        <option value="active">Active</option>
+        <option value="expired">Expired</option>
+      </select>
+    </div>
+    <div class="field"><label>Expires at (optional)</label><input id="nu-exp" type="date"></div>
+    <div class="auth-err" id="add-user-err"></div>
+    <div class="modal-footer">
+      <button class="btn-sm" onclick="closeAddUser()">Cancel</button>
+      <button class="btn-save" onclick="createUser()">Create user</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT USER MODAL -->
+<div class="modal-overlay" id="edit-user-modal">
+  <div class="modal">
+    <h3>Edit user</h3>
+    <input type="hidden" id="eu-id">
+    <div class="field"><label>Full name</label><input id="eu-name" type="text"></div>
+    <div class="field"><label>Subscription status</label>
+      <select id="eu-sub" style="width:100%">
+        <option value="trial">Trial</option>
+        <option value="active">Active</option>
+        <option value="expired">Expired</option>
+      </select>
+    </div>
+    <div class="field"><label>Expires at (optional)</label><input id="eu-exp" type="date"></div>
+    <div class="ss" id="edit-user-status"></div>
+    <div class="modal-footer">
+      <button class="btn-sm" onclick="closeEditUser()">Cancel</button>
+      <button class="btn-save" onclick="saveEditUser()">Save changes</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://evvfexweerujydaspnoi.supabase.co';
+const SUPABASE_KEY = window.__SUPABASE_KEY__ || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV2dmZleHdlZXJ1anlkYXNwbm9pIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3NTQ1ODQsImV4cCI6MjA5MjMzMDU4NH0.QqDtWN9mh0zRZyTmSZq6nigmIn01oVNix5R7dw0UpC8';
+
+const { createClient } = supabase;
+let sb, currentUser, profiles = [], tradeCounts = {};
+
+function init() {
+  if (!SUPABASE_KEY) {
+    document.getElementById('auth-err').textContent = 'Missing Supabase key.';
+    return;
+  }
+  sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+  sb.auth.onAuthStateChange(async (event, session) => {
+    if (session) {
+      currentUser = session.user;
+      const { data } = await sb.from('profiles').select('role').eq('id', currentUser.id).single();
+      if (!data || data.role !== 'admin') {
+        await sb.auth.signOut();
+        document.getElementById('auth-err').textContent = 'Admin access only.';
+        return;
+      }
+      document.getElementById('auth-wrap').style.display = 'none';
+      document.getElementById('admin-panel').style.display = 'block';
+      await loadData();
+    } else {
+      document.getElementById('auth-wrap').style.display = 'flex';
+      document.getElementById('admin-panel').style.display = 'none';
+    }
+  });
+}
+
+async function signIn() {
+  const email = document.getElementById('l-email').value.trim();
+  const pass = document.getElementById('l-pass').value;
+  const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+  if (error) document.getElementById('auth-err').textContent = error.message;
+}
+
+async function signOut() {
+  await sb.auth.signOut();
+}
+
+async function loadData() {
+  const { data: p } = await sb.from('profiles').select('*').neq('role', 'admin').order('created_at');
+  profiles = p || [];
+  const { data: tc } = await sb.from('trades').select('user_id');
+  tradeCounts = {};
+  (tc||[]).forEach(t => { tradeCounts[t.user_id] = (tradeCounts[t.user_id]||0)+1; });
+  renderStats();
+  renderUsers();
+}
+
+function renderStats() {
+  const active = profiles.filter(p => p.subscription_status === 'active').length;
+  const trial = profiles.filter(p => p.subscription_status === 'trial').length;
+  const expired = profiles.filter(p => p.subscription_status === 'expired').length;
+  const totalTrades = Object.values(tradeCounts).reduce((a,b)=>a+b,0);
+  document.getElementById('admin-stats').innerHTML = `
+    <div class="stat"><div class="lbl">Total users</div><div class="val">${profiles.length}</div></div>
+    <div class="stat"><div class="lbl">Active subscribers</div><div class="val" style="color:var(--green)">${active}</div></div>
+    <div class="stat"><div class="lbl">Trial</div><div class="val" style="color:var(--blue)">${trial}</div></div>
+    <div class="stat"><div class="lbl">Total trades</div><div class="val">${totalTrades}</div></div>
+  `;
+}
+
+function subBadge(s) {
+  const m = {active:'b-active Active',trial:'b-trial Trial',expired:'b-expired Expired'};
+  const [cls,lbl] = (m[s]||'b-trial Trial').split(' ');
+  return `<span class="badge ${cls}">${lbl}</span>`;
+}
+
+function renderUsers() {
+  const tbody = document.getElementById('users-tbody');
+  if (!profiles.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text2);padding:20px">No users yet</td></tr>'; return; }
+  tbody.innerHTML = profiles.map(p => `
+    <tr>
+      <td>
+        <div style="font-weight:500;font-size:13px">${p.full_name||'—'}</div>
+        <div style="font-size:11px;color:var(--text2)">${p.email}</div>
+      </td>
+      <td>${subBadge(p.subscription_status)}</td>
+      <td style="font-size:12px;color:var(--text2)">${p.subscription_expires_at?new Date(p.subscription_expires_at).toLocaleDateString('en-GB'):'—'}</td>
+      <td style="font-size:13px">${tradeCounts[p.id]||0}</td>
+      <td>
+        <button class="btn-sm" onclick="openEditUser('${p.id}')">Edit</button>
+        <button class="btn-danger" style="margin-left:6px" onclick="deleteUser('${p.id}')">Delete</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function openAddUser() { document.getElementById('add-user-modal').classList.add('open'); }
+function closeAddUser() { document.getElementById('add-user-modal').classList.remove('open'); }
+
+async function createUser() {
+  const name = document.getElementById('nu-name').value.trim();
+  const email = document.getElementById('nu-email').value.trim();
+  const pass = document.getElementById('nu-pass').value;
+  const sub = document.getElementById('nu-sub').value;
+  const exp = document.getElementById('nu-exp').value;
+  if (!name||!email||!pass) { document.getElementById('add-user-err').textContent = 'Fill in all required fields'; return; }
+  const { data, error } = await sb.auth.admin.createUser({ email, password: pass, email_confirm: true });
+  if (error) { document.getElementById('add-user-err').textContent = error.message; return; }
+  await sb.from('profiles').update({
+    full_name: name,
+    subscription_status: sub,
+    subscription_expires_at: exp || null
+  }).eq('id', data.user.id);
+  closeAddUser();
+  await loadData();
+}
+
+function openEditUser(id) {
+  const p = profiles.find(x => x.id === id); if (!p) return;
+  document.getElementById('eu-id').value = id;
+  document.getElementById('eu-name').value = p.full_name||'';
+  document.getElementById('eu-sub').value = p.subscription_status||'trial';
+  document.getElementById('eu-exp').value = p.subscription_expires_at?p.subscription_expires_at.split('T')[0]:'';
+  document.getElementById('edit-user-modal').classList.add('open');
+}
+function closeEditUser() { document.getElementById('edit-user-modal').classList.remove('open'); }
+
+async function saveEditUser() {
+  const id = document.getElementById('eu-id').value;
+  const name = document.getElementById('eu-name').value.trim();
+  const sub = document.getElementById('eu-sub').value;
+  const exp = document.getElementById('eu-exp').value;
+  const { error } = await sb.from('profiles').update({
+    full_name: name,
+    subscription_status: sub,
+    subscription_expires_at: exp || null
+  }).eq('id', id);
+  if (error) { document.getElementById('edit-user-status').textContent = 'Error: ' + error.message; return; }
+  closeEditUser();
+  await loadData();
+}
+
+async function deleteUser(id) {
+  if (!confirm('Delete this user and all their trades?')) return;
+  await sb.from('trades').delete().eq('user_id', id);
+  await sb.from('profiles').delete().eq('id', id);
+  await loadData();
+}
+
+init();
+</script>
+</body>
+</html>
